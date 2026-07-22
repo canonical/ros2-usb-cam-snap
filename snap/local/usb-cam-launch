@@ -2,44 +2,32 @@
 # snap/local/usb-cam-launch
 #
 # Entry point for the `usb-cam` daemon app. Reads the runtime.env file
-# rendered by the configure hook (snap/hooks/configure) and execs the
-# upstream usb_cam node with a matching ROS params YAML file.
-#
-# This script runs inside the ros2-jazzy-ros-base extension's command-chain,
-# so the ROS 2 underlay environment (AMENT_PREFIX_PATH, LD_LIBRARY_PATH,
-# PYTHONPATH, ...) is already sourced -- provided the `ros-jazzy-ros-base`
-# content interface is connected (see the check below). The `ros2` CLI is
-# not used here: usb_cam's package.xml doesn't depend on it, and it lives in
-# the content snap rather than being bundled, so we exec the installed
-# executable directly instead of going through `ros2 run`.
+# rendered by the configure hook (snap/hooks/configure) and launches the
+# upstream usb_cam node via `ros2 run` with a matching ROS params YAML file.
 set -eu
 
-# The ros2-jazzy-ros-base extension only populates $SNAP/opt/ros/underlay_ws
-# (and wires up LD_LIBRARY_PATH/AMENT_PREFIX_PATH for it) once the
-# `ros-jazzy-ros-base` content interface is actually connected. Auto-connect
-# only kicks in for snaps installed from the Snap Store; sideloaded/
-# `--dangerous` installs (e.g. local testing, CI) need a manual `snap
-# connect`. Fail fast with a clear message instead of a cryptic dynamic
-# linker error from usb_cam_node_exe.
 if [ ! -d "$SNAP/opt/ros/underlay_ws/opt/ros/$ROS_DISTRO" ]; then
   echo "usb-cam: the 'ros-jazzy-ros-base' content interface is not connected (\$SNAP/opt/ros/underlay_ws is empty)." >&2
   echo "usb-cam: run: sudo snap connect $SNAP_NAME:ros-jazzy-ros-base ros-jazzy-ros-base && sudo snap restart $SNAP_NAME" >&2
   exit 1
 fi
 
+if ! command -v ros2 >/dev/null 2>&1; then
+  echo "usb-cam: 'ros2' not found on PATH even though the content interface looks connected -- this is unexpected, please report a bug." >&2
+  exit 1
+fi
+
 # Managed default config, seeded once by snap/hooks/install and kept in sync
-# by snap/hooks/configure (device= patches its video_device line). This is
-# the fallback used when no `config-file` override is set.
+# by snap/hooks/configure (video-device= patches its video_device line).
+# This is the fallback used when no `config-file` override is set.
 MANAGED_FILE="$SNAP_COMMON/config/usb_cam.yaml"
 PARAMS_FILE="$MANAGED_FILE"
 RUNTIME_ENV="$SNAP_DATA/runtime.env"
-USB_CAM_NODE_EXE="$SNAP/opt/ros/snap/lib/usb_cam/usb_cam_node_exe"
 # Separate location for URL-fetched overrides so we never clobber the
 # managed default file above.
 CONFIG_FILE_DOWNLOAD="$SNAP_COMMON/config/usb_cam.remote.yaml"
 
-# NAMESPACE, NODE_NAME, ROS_DOMAIN_ID, RMW_IMPLEMENTATION, CONFIG_FILE_URL,
-# CONFIG_FILE_PATH (all optional)
+# NAMESPACE, CONFIG_FILE_URL, CONFIG_FILE_PATH (all optional)
 if [ -f "$RUNTIME_ENV" ]; then
   # shellcheck disable=SC1090
   . "$RUNTIME_ENV"
@@ -62,16 +50,12 @@ elif [ -n "${CONFIG_FILE_PATH:-}" ]; then
 fi
 
 if [ ! -f "$PARAMS_FILE" ]; then
-  echo "usb-cam: no configuration found yet at $PARAMS_FILE" >&2
-  echo "usb-cam: run 'snap set $SNAP_NAME device=/dev/videoN' (or config-file=...) to configure and start the service" >&2
+  echo "usb-cam: configuration file not found at $PARAMS_FILE" >&2
+  echo "usb-cam: this is unexpected because the snap seeds a default config on install; check the file or reinstall the snap" >&2
   exit 1
 fi
 
-set -- "$USB_CAM_NODE_EXE" --ros-args --params-file "$PARAMS_FILE"
-
-if [ -n "${NODE_NAME:-}" ]; then
-  set -- "$@" -r __node:="$NODE_NAME"
-fi
+set -- ros2 run usb_cam usb_cam_node_exe --ros-args --params-file "$PARAMS_FILE"
 
 if [ -n "${NAMESPACE:-}" ]; then
   set -- "$@" -r __ns:="$NAMESPACE"

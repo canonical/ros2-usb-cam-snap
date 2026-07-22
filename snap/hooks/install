@@ -1,12 +1,7 @@
 #!/bin/bash
-# snap/hooks/install
-#
-# Runs once, at first install only (snapd does NOT re-run this on refresh).
+
 # Seeds a managed default ROS params YAML file under $SNAP_COMMON so the
-# camera has sane defaults to edit/patch from day one, without ever
-# clobbering an admin's hand edits on subsequent refreshes (see the
-# defensive re-check in snap/hooks/configure, which covers upgrades from
-# older versions of this snap that predate this hook).
+# camera has sane defaults to edit/patch.
 set -e
 
 mkdir -p "$SNAP_COMMON/config"

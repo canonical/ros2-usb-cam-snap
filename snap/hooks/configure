@@ -1,19 +1,19 @@
 #!/bin/bash
-# snap/hooks/configure
-#
+
 # Applies `snap set usb-cam <key>=<value>` configuration. Camera parameters
 # are always driven by a ROS params YAML file (matching upstream usb_cam's
 # own --params-file interface); this hook only handles:
 #
-#   - device: a convenience shortcut that patches the video_device line of
-#     the managed default config at $SNAP_COMMON/config/usb_cam.yaml (seeded
-#     once by snap/hooks/install). Ignored if `config-file` is set.
+#   - video-device: a convenience shortcut that patches the video_device
+#     line of the managed default config at $SNAP_COMMON/config/usb_cam.yaml
+#     (seeded once by snap/hooks/install). Named after the ROS parameter it
+#     sets (video_device); snap config keys must be dash-separated rather
+#     than underscore-separated. Ignored if `config-file` is set.
 #   - config-file: a full override, either a local path under $SNAP_COMMON
 #     or a URL, taking precedence over the managed default entirely. See
 #     snap/local/usb-cam-launch for how it's consumed.
-#   - namespace / node-name / ros-domain-id / rmw-implementation: launcher
-#     invocation details that aren't ROS node parameters (remap args / DDS
-#     env vars), rendered to $SNAP_DATA/runtime.env.
+#   - namespace: launcher invocation details that aren't ROS node
+#     parameters (remap args), rendered to $SNAP_DATA/runtime.env.
 #
 # For anything else (resolution, framerate, pixel format, brightness, ...),
 # edit $SNAP_COMMON/config/usb_cam.yaml directly (or point `config-file` at
@@ -29,23 +29,53 @@ get() {
   printf '%s' "$val"
 }
 
+# ROS 2 names (node names, namespace segments) may only contain letters,
+# digits and underscores, and must start with a letter or underscore --
+# dashes are NOT allowed. Validate here and fail with a clear message
+# instead of letting rcl abort the process at startup with a cryptic
+# "Couldn't parse remap rule" error.
+is_valid_ros_token() {
+  case "$1" in
+    '') return 1 ;;
+  esac
+  printf '%s' "$1" | grep -qE '^[a-zA-Z_][a-zA-Z0-9_]*$'
+}
+
+validate_namespace() {
+  ns="$1"
+  [ "$ns" = "/" ] && return 0
+  case "$ns" in
+    /*) : ;;
+    *) return 1 ;;
+  esac
+  rest="${ns#/}"
+  IFS='/' read -ra segments <<< "$rest"
+  for seg in "${segments[@]}"; do
+    is_valid_ros_token "$seg" || return 1
+  done
+}
+
 MANAGED_FILE="$SNAP_COMMON/config/usb_cam.yaml"
 
-# Defensive: `install` doesn't re-run on refresh, so make sure the managed
+# `install` doesn't re-run on refresh, so make sure the managed
 # file exists even when upgrading from a version that predates this hook.
 mkdir -p "$SNAP_COMMON/config"
 if [ ! -f "$MANAGED_FILE" ]; then
   cp "$SNAP/usr/share/usb-cam/default-params.yaml" "$MANAGED_FILE"
 fi
 
-DEVICE="$(get device "")"
+VIDEO_DEVICE="$(get video-device "")"
 NAMESPACE="$(get namespace "")"
-NODE_NAME="$(get node-name "")"
-ROS_DOMAIN_ID="$(get ros-domain-id "")"
-RMW_IMPLEMENTATION="$(get rmw-implementation "")"
 CONFIG_FILE="$(get config-file "")"
 CONFIG_FILE_URL=""
 CONFIG_FILE_PATH=""
+
+if [ -n "$NAMESPACE" ] && ! validate_namespace "$NAMESPACE"; then
+  suggestion="$(printf '%s' "$NAMESPACE" | tr '-' '_')"
+  echo "usb-cam: invalid namespace '$NAMESPACE' -- ROS namespaces must start with '/' and each segment may only contain letters, digits and underscores (no dashes). Try: namespace=$suggestion" >&2
+  snapctl set-health blocked "invalid namespace '$NAMESPACE': use '/' + letters/digits/underscores only, e.g. $suggestion"
+  exit 1
+fi
 
 if [ -n "$CONFIG_FILE" ]; then
   case "$CONFIG_FILE" in
@@ -66,12 +96,12 @@ if [ -n "$CONFIG_FILE" ]; then
       exit 1
       ;;
   esac
-  if [ -n "$DEVICE" ]; then
-    echo "usb-cam: config-file override active ($CONFIG_FILE) -- 'device' is ignored" >&2
+  if [ -n "$VIDEO_DEVICE" ]; then
+    echo "usb-cam: config-file override active ($CONFIG_FILE) -- 'video-device' is ignored" >&2
   fi
-elif [ -n "$DEVICE" ]; then
+elif [ -n "$VIDEO_DEVICE" ]; then
   if grep -q 'video_device: "' "$MANAGED_FILE"; then
-    sed -i "s|video_device: \"[^\"]*\"|video_device: \"$DEVICE\"|" "$MANAGED_FILE"
+    sed -i "s|video_device: \"[^\"]*\"|video_device: \"$VIDEO_DEVICE\"|" "$MANAGED_FILE"
   else
     echo "usb-cam: could not find a 'video_device: \"...\"' line in $MANAGED_FILE to patch -- edit it directly instead" >&2
     snapctl set-health blocked "could not patch video_device in $MANAGED_FILE -- edit it directly"
@@ -83,28 +113,11 @@ mkdir -p "$SNAP_DATA"
 
 {
   [ -n "$NAMESPACE" ] && echo "NAMESPACE=\"$NAMESPACE\""
-  [ -n "$NODE_NAME" ] && echo "NODE_NAME=\"$NODE_NAME\""
-  [ -n "$ROS_DOMAIN_ID" ] && echo "ROS_DOMAIN_ID=\"$ROS_DOMAIN_ID\""
-  [ -n "$RMW_IMPLEMENTATION" ] && echo "RMW_IMPLEMENTATION=\"$RMW_IMPLEMENTATION\""
   [ -n "$CONFIG_FILE_URL" ] && echo "CONFIG_FILE_URL=\"$CONFIG_FILE_URL\""
   [ -n "$CONFIG_FILE_PATH" ] && echo "CONFIG_FILE_PATH=\"$CONFIG_FILE_PATH\""
   true
 } > "$SNAP_DATA/runtime.env"
 
-# Readiness: a config-file override is trusted as-is; otherwise check
-# whether the managed file currently has a non-empty video_device (so
-# health stays 'okay' even across a later 'snap unset device').
-READY=false
-if [ -n "$CONFIG_FILE" ]; then
-  READY=true
-elif grep -qE 'video_device: "[^"]+"' "$MANAGED_FILE"; then
-  READY=true
-fi
-
-if [ "$READY" = true ]; then
-  snapctl set-health okay
-  snapctl start --enable "$SNAP_NAME.usb-cam" || true
-  snapctl restart "$SNAP_NAME.usb-cam" || true
-else
-  snapctl set-health waiting "waiting for 'snap set $SNAP_NAME device=/dev/videoN' (or config-file=...)"
-fi
+snapctl set-health okay
+snapctl start --enable "$SNAP_NAME.usb-cam" || true
+snapctl restart "$SNAP_NAME.usb-cam" || true

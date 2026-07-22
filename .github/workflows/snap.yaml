@@ -43,8 +43,8 @@ jobs:
         echo "=== Checking the managed default config was seeded by the install hook ==="
         sudo test -f /var/snap/"$SNAP_NAME"/common/config/usb_cam.yaml
 
-        echo "=== Configuring via the 'device' shortcut with a non-existent path (safe, no hardware) ==="
-        sudo snap set "$SNAP_NAME" device=/dev/video99
+        echo "=== Configuring via the 'video-device' shortcut with a non-existent path (safe, no hardware) ==="
+        sudo snap set "$SNAP_NAME" video-device=/dev/video99
         sleep 5
         snap services "$SNAP_NAME"
         grep -q 'video_device: "/dev/video99"' <(sudo cat /var/snap/"$SNAP_NAME"/common/config/usb_cam.yaml)
@@ -81,3 +81,13 @@ jobs:
         cat /tmp/configure-stderr
 
         sudo snap unset "$SNAP_NAME" config-file
+
+        echo "=== Rejecting a namespace with a dash (invalid ROS name) ==="
+        if sudo snap set "$SNAP_NAME" namespace=/static-camera 2>/tmp/configure-stderr; then
+          echo "expected 'snap set namespace=/static-camera' to fail, but it succeeded"
+          exit 1
+        fi
+        cat /tmp/configure-stderr
+        sudo snap set "$SNAP_NAME" namespace=/static_camera
+        sleep 5
+        snap services "$SNAP_NAME"
