@@ -16,10 +16,12 @@ jobs:
   snap:
     permissions:
       contents: read
+      actions: write
     uses: canonical/robotics-actions-workflows/.github/workflows/snap.yaml@main
     secrets:
       snapstore-login: ${{ secrets.SNAPSTORE_LOGIN }}
     with:
+      cleanup: true
       snapcraft-enable-experimental-extensions: true
       snap-install-args: --dangerous
       snap-test-script: |
