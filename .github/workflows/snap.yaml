@@ -1,0 +1,83 @@
+name: usb-cam snap
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  snap:
+    permissions:
+      contents: read
+    uses: canonical/robotics-actions-workflows/.github/workflows/snap.yaml@main
+    secrets:
+      snapstore-login: ${{ secrets.SNAPSTORE_LOGIN }}
+    with:
+      snapcraft-enable-experimental-extensions: true
+      snap-install-args: --dangerous
+      snap-test-script: |
+        #!/bin/bash
+        set -euxo pipefail
+
+        SNAP_NAME=usb-cam
+
+        echo "=== Checking snap is installed ==="
+        snap list "$SNAP_NAME"
+
+        echo "=== Connecting the ros-jazzy-ros-base content interface ==="
+        # Sideloaded/--dangerous installs (as used in this CI job) are not
+        # auto-connected by snapd, unlike Snap Store installs which
+        # auto-connect via the content plug's default-provider.
+        sudo snap connect "$SNAP_NAME":ros-jazzy-ros-base ros-jazzy-ros-base
+
+        echo "=== Checking confinement + interfaces (camera should be strict/manual, content should be connected) ==="
+        snap connections "$SNAP_NAME"
+
+        echo "=== Checking the managed default config was seeded by the install hook ==="
+        sudo test -f /var/snap/"$SNAP_NAME"/common/config/usb_cam.yaml
+
+        echo "=== Configuring via the 'device' shortcut with a non-existent path (safe, no hardware) ==="
+        sudo snap set "$SNAP_NAME" device=/dev/video99
+        sleep 5
+        snap services "$SNAP_NAME"
+        grep -q 'video_device: "/dev/video99"' <(sudo cat /var/snap/"$SNAP_NAME"/common/config/usb_cam.yaml)
+        sudo snap logs "$SNAP_NAME" -n 30 || true
+
+        echo "=== Configuring via a separate config-file override (safe, no hardware) ==="
+        sudo mkdir -p /var/snap/"$SNAP_NAME"/common/my-config
+        cat <<'PARAMS_EOF' | sudo tee /var/snap/"$SNAP_NAME"/common/my-config/usb_cam.yaml >/dev/null
+        /**:
+          ros__parameters:
+            video_device: "/dev/video99"
+            framerate: 30.0
+            io_method: "mmap"
+            pixel_format: "mjpeg2rgb"
+            av_device_format: "YUV422P"
+            image_width: 640
+            image_height: 480
+            frame_id: "cam_test"
+            camera_name: "cam_test"
+        PARAMS_EOF
+        sudo snap set "$SNAP_NAME" config-file=/var/snap/"$SNAP_NAME"/common/my-config/usb_cam.yaml
+        sleep 5
+        snap services "$SNAP_NAME"
+        sudo snap logs "$SNAP_NAME" -n 30 || true
+        # The launcher logs the exec line, which should reference our override
+        # file instead of the managed default config.
+        sudo snap logs "$SNAP_NAME" -n 30 | grep -q "my-config/usb_cam.yaml"
+
+        echo "=== Rejecting an invalid config-file path ==="
+        if sudo snap set "$SNAP_NAME" config-file=/tmp/not-allowed.yaml 2>/tmp/configure-stderr; then
+          echo "expected 'snap set config-file=/tmp/not-allowed.yaml' to fail, but it succeeded"
+          exit 1
+        fi
+        cat /tmp/configure-stderr
+
+        sudo snap unset "$SNAP_NAME" config-file

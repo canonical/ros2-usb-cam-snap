@@ -1,0 +1,117 @@
+name: usb-cam
+title: usb-cam
+base: core24
+version: '0.8.1'
+license: BSD-3-Clause
+contact: https://github.com/ros-drivers/usb_cam/issues
+issues: https://github.com/ros-drivers/usb_cam/issues
+source-code: https://github.com/ros-drivers/usb_cam
+website: https://github.com/ros-drivers/usb_cam
+summary: ROS 2 driver for V4L2 USB cameras (Logitech C920 and others)
+description: |
+  Packages the upstream ros-drivers/usb_cam ROS 2 (Jazzy) node as a
+  strictly-confined, always-on snap. Runs `usb_cam_node_exe` as a systemd
+  daemon, sharing the ROS 2 Jazzy runtime from the `ros-jazzy-ros-base`
+  foundational/content snap instead of bundling it (smaller snap, shared
+  across every ROS 2 Jazzy snap on the same host/Ubuntu Core device).
+
+  Camera configuration always goes through a ROS params YAML file, matching
+  upstream usb_cam's own `--params-file` interface. A managed default is
+  seeded at $SNAP_COMMON/config/usb_cam.yaml on install -- edit it directly
+  for full control, or use the `device` key as a shortcut for the common
+  case of just pointing at a camera:
+
+      snap install usb-cam
+      snap connect usb-cam:camera
+      snap set usb-cam device=/dev/video4 namespace=/static_camera
+
+  For anything beyond the device path (resolution, framerate, pixel format,
+  brightness, camera_info_url, ...), edit $SNAP_COMMON/config/usb_cam.yaml
+  directly, then `sudo snap restart usb-cam` -- or hand the snap a
+  completely separate file/URL, which takes precedence over the managed
+  default entirely:
+
+      snap set usb-cam config-file=/var/snap/usb-cam/common/usb_cam.yaml
+      snap set usb-cam config-file=https://example.com/usb_cam.yaml
+
+  Run a second camera on the same host with snapd parallel installs:
+
+      snap install --name=usb-cam-wrist usb-cam
+
+  Publishes the standard usb_cam topics (`image_raw`, `image_raw/compressed`,
+  `camera_info`) under `<namespace>/<camera-name>` (or just `<namespace>`).
+
+grade: stable
+confinement: strict
+
+platforms:
+  amd64:
+  arm64:
+
+apps:
+  usb-cam:
+    extensions: [ros2-jazzy-ros-base]
+    command: usr/bin/usb-cam-launch
+    environment:
+      LD_LIBRARY_PATH: >-
+        $SNAP/usr/lib/$SNAPCRAFT_ARCH_TRIPLET/lapack:
+        $SNAP/usr/lib/$SNAPCRAFT_ARCH_TRIPLET/blas:
+        $LD_LIBRARY_PATH
+    daemon: simple
+    install-mode: disable
+    restart-condition: on-failure
+    restart-delay: 5s
+    plugs:
+      - camera
+      - network
+      - network-bind
+
+hooks:
+  configure:
+    plugs:
+      - camera
+
+package-repositories:
+  - type: apt
+    url: http://packages.ros.org/ros2/ubuntu
+    suites: [noble]
+    components: [main]
+    key-id: C1CF6E31E6BADE8868B172B4F42ED6FBAB17C654
+    key-server: keyserver.ubuntu.com
+
+parts:
+  usb-cam:
+    plugin: colcon
+    source: https://github.com/ros-drivers/usb_cam.git
+    source-tag: '0.8.1'
+    colcon-packages: [usb_cam]
+    # cv_bridge (via OpenCV) dlopen()s liblapack/libblas at runtime, but they
+    # live in usr/lib/<triplet>/lapack|blas/ which isn't on the default
+    # library search path -- staged explicitly and exposed via the app's
+    # LD_LIBRARY_PATH below.
+    #
+    # libgomp1/libdav1d7/libcurl3t64-gnutls/libslang2 are transitive runtime
+    # deps of libusb_cam.so/OpenCV/ffmpeg that the ros2-jazzy-ros-base
+    # extension's narrower dependency set doesn't pull in automatically
+    # (unlike the self-contained ros2-jazzy extension) -- staged explicitly
+    # to keep the library linter clean and avoid dlopen() failures.
+    stage-packages:
+      - liblapack3
+      - libblas3
+      - libgomp1
+      - libdav1d7
+      - libcurl3t64-gnutls
+      - libslang2
+
+  launcher:
+    plugin: nil
+    source: snap/local
+    # curl + ca-certificates are needed at runtime by usb-cam-launch to
+    # download the optional URL-based `config-file` override on every
+    # daemon start.
+    stage-packages: [curl, ca-certificates]
+    override-build: |
+      mkdir -p "${CRAFT_PART_INSTALL}/usr/bin"
+      install -m 755 "${CRAFT_PART_SRC}/usb-cam-launch" "${CRAFT_PART_INSTALL}/usr/bin/usb-cam-launch"
+      mkdir -p "${CRAFT_PART_INSTALL}/usr/share/usb-cam"
+      install -m 644 "${CRAFT_PART_SRC}/default-params.yaml" "${CRAFT_PART_INSTALL}/usr/share/usb-cam/default-params.yaml"
