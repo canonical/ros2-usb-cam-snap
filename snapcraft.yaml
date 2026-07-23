@@ -69,14 +69,6 @@ hooks:
     plugs:
       - camera
 
-package-repositories:
-  - type: apt
-    url: http://packages.ros.org/ros2/ubuntu
-    suites: [noble]
-    components: [main]
-    key-id: C1CF6E31E6BADE8868B172B4F42ED6FBAB17C654
-    key-server: keyserver.ubuntu.com
-
 parts:
   usb-cam:
     plugin: colcon
