@@ -34,10 +34,7 @@ jobs:
         snap list "$SNAP_NAME"
 
         echo "=== Connecting the ros-jazzy-ros-base content interface ==="
-        # Sideloaded/--dangerous installs (as used in this CI job) are not
-        # auto-connected by snapd, unlike Snap Store installs which
-        # auto-connect via the content plug's default-provider.
-        sudo snap connect "$SNAP_NAME":ros-jazzy-ros-base ros-jazzy-ros-base
+        sudo snap connect "$SNAP_NAME":ros-jazzy-ros-base ros-jazzy-ros-base:ros-jazzy-ros-base
 
         echo "=== Checking confinement + interfaces (camera should be strict/manual, content should be connected) ==="
         snap connections "$SNAP_NAME"
