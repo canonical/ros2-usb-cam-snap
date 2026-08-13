@@ -1,5 +1,5 @@
-name: usb-cam
-title: usb-cam
+name: ros2-usb-cam
+title: ROS 2 usb-cam
 base: core24
 version: '0.8.1'
 license: BSD-3-Clause
@@ -20,21 +20,21 @@ description: |
   control, or use the `video-device` key as a shortcut for the common case
   of just pointing at a camera:
 
-      snap install usb-cam
-      snap connect usb-cam:camera
-      snap set usb-cam video-device=/dev/video4 namespace=/static_camera
+      snap install ros2-usb-cam
+      snap connect ros2-usb-cam:camera
+      snap set ros2-usb-cam video-device=/dev/video4 namespace=/static_camera
 
   For anything beyond the video-device path (resolution, framerate, pixel
   format, brightness, camera_info_url, ...), edit
   $SNAP_COMMON/config/usb_cam.yaml directly, or hand the snap a completely
   separate file/URL, which takes precedence over the managed default:
 
-      snap set usb-cam config-file=/var/snap/usb-cam/common/config/usb_cam.yaml
-      snap set usb-cam config-file=https://example.com/usb_cam.yaml
+      snap set ros2-usb-cam config-file=/var/snap/ros2-usb-cam/common/config/usb_cam.yaml
+      snap set ros2-usb-cam config-file=https://example.com/usb_cam.yaml
 
   Run a second camera on the same host with snapd parallel installs:
 
-      snap install --name=usb-cam-wrist usb-cam
+      snap install --name=ros2-usb-cam-wrist ros2-usb-cam
 
   The snap publishes the standard usb_cam topics (`image_raw`, `image_raw/compressed`,
   `camera_info`) under `<namespace>/<camera-name>` (or just `<namespace>`).
@@ -49,7 +49,7 @@ platforms:
 apps:
   usb-cam:
     extensions: [ros2-jazzy-ros-base]
-    command: usr/bin/usb-cam-launch
+    command: $SNAP/usr/bin/usb-cam-launch
     environment:
       LD_LIBRARY_PATH: >-
         $SNAP/usr/lib/$SNAPCRAFT_ARCH_TRIPLET/lapack:
