@@ -49,7 +49,7 @@ platforms:
 apps:
   usb-cam:
     extensions: [ros2-jazzy-ros-base]
-    command: $SNAP/usr/bin/usb-cam-launch
+    command: usr/bin/usb-cam-launch
     environment:
       LD_LIBRARY_PATH: >-
         $SNAP/usr/lib/$SNAPCRAFT_ARCH_TRIPLET/lapack:

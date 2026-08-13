@@ -9,8 +9,8 @@ instead of bundling it.
 ## Install
 
 ```
-snap install usb-cam
-snap connect usb-cam:camera
+snap install ros2-usb-cam
+snap connect ros2-usb-cam:camera
 ```
 
 **If installed from the Snap Store**, the `ros-jazzy-ros-base` content
@@ -24,13 +24,13 @@ launcher now detects this case and fails with a clearer message instead).
 Connect it manually:
 
 ```
-sudo snap connect usb-cam:ros-jazzy-ros-base ros-jazzy-ros-base
-sudo snap restart usb-cam
+sudo snap connect ros2-usb-cam:ros-jazzy-ros-base ros-jazzy-ros-base
+sudo snap restart ros2-usb-cam
 ```
 
 On install, a managed default ROS params file is seeded at
 `$SNAP_COMMON/config/usb_cam.yaml` (i.e.
-`/var/snap/usb-cam/common/config/usb_cam.yaml`), matching upstream's own
+`/var/snap/ros2-usb-cam/common/config/usb_cam.yaml`), matching upstream's own
 [`params_1.yaml`](https://github.com/ros-drivers/usb_cam/blob/ros2/config/params_1.yaml)
 defaults, including `video_device: "/dev/video0"`. If that matches your
 setup, the managed file can be used as-is; otherwise override it below.
@@ -49,7 +49,7 @@ dash. This is just a convenience shortcut for editing the YAML when the
 only thing you want to change is the device path:
 
 ```
-snap set usb-cam video-device=/dev/video4
+snap set ros2-usb-cam video-device=/dev/video4
 ```
 
 ### Full control: edit the managed file directly
@@ -59,8 +59,8 @@ For anything else (resolution, framerate, pixel format, brightness,
 directly and restart:
 
 ```
-sudo vim /var/snap/usb-cam/common/config/usb_cam.yaml
-sudo snap restart usb-cam
+sudo vim /var/snap/ros2-usb-cam/common/config/usb_cam.yaml
+sudo snap restart ros2-usb-cam
 ```
 
 ### Advanced: `config-file` (separate file or URL)
@@ -72,19 +72,19 @@ default entirely** (and `video-device` is ignored):
 ```
 # Local file: must live under $SNAP_COMMON so the strictly-confined snap
 # can read it (no extra `snap connect` needed).
-sudo mkdir -p /var/snap/usb-cam/common/my-config
-sudo cp my_params.yaml /var/snap/usb-cam/common/my-config/usb_cam.yaml
-snap set usb-cam config-file=/var/snap/usb-cam/common/my-config/usb_cam.yaml
+sudo mkdir -p /var/snap/ros2-usb-cam/common/my-config
+sudo cp my_params.yaml /var/snap/ros2-usb-cam/common/my-config/usb_cam.yaml
+snap set ros2-usb-cam config-file=/var/snap/ros2-usb-cam/common/my-config/usb_cam.yaml
 
 # URL: fetched fresh on every daemon start/restart, so an update to the
 # upstream file is picked up on the next launch without re-running `snap set`.
-snap set usb-cam config-file=https://example.com/usb_cam.yaml
+snap set ros2-usb-cam config-file=https://example.com/usb_cam.yaml
 ```
 
 To go back to the managed default file:
 
 ```
-snap unset usb-cam config-file
+snap unset ros2-usb-cam config-file
 ```
 
 ### Other keys
@@ -105,7 +105,7 @@ crash-loop at startup with a cryptic `rcl` parse error.
 Use snapd parallel installs:
 
 ```
-snap install --name=usb-cam-wrist usb-cam
+snap install --name=ros2-usb-cam-wrist ros2-usb-cam
 ```
 
 ## Topics
@@ -130,13 +130,13 @@ the ROS 2 Jazzy runtime via the
 snap (see
 [canonical/ros-content-sharing-snaps](https://github.com/canonical/ros-content-sharing-snaps))
 instead of bundling the full ROS 2 runtime inside this snap. This keeps
-`usb-cam` smaller and lets multiple ROS 2 Jazzy snaps on the same host/Ubuntu
+`ros2-usb-cam` smaller and lets multiple ROS 2 Jazzy snaps on the same host/Ubuntu
 Core device share one copy of the runtime (and its security updates), at the
 cost of a runtime dependency on that content snap being installed and kept
 compatible.
 
 For internet-connected hosts, snapd auto-installs `ros-jazzy-ros-base` via
-its `default-provider` the first time `usb-cam` (or any other snap using the
+its `default-provider` the first time `ros2-usb-cam` (or any other snap using the
 same content) is installed from the Snap Store -- no extra step needed. This
 auto-connect does **not** apply to sideloaded/`--dangerous` installs (local
 builds, CI) -- see [Install](#install) above for the manual `snap connect`
