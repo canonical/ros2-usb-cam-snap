@@ -1,9 +1,9 @@
 #!/bin/bash
 # snap/local/usb-cam-launch
 #
-# Entry point for the `usb-cam` daemon app. Reads the runtime.env file
-# rendered by the configure hook (snap/hooks/configure) and launches the
-# upstream usb_cam node via `ros2 run` with a matching ROS params YAML file.
+# Entry point for the `usb-cam` daemon app. Reads snap configuration at
+# startup and launches the upstream usb_cam node via `ros2 run` with a
+# matching ROS params YAML file.
 set -eu
 
 if [ ! -d "$SNAP/opt/ros/underlay_ws/opt/ros/$ROS_DISTRO" ]; then
@@ -17,36 +17,31 @@ if ! command -v ros2 >/dev/null 2>&1; then
   exit 1
 fi
 
-# Managed default config, seeded once by snap/hooks/install and kept in sync
+# Default config file seeded once by snap/hooks/install and kept in sync
 # by snap/hooks/configure (video-device= patches its video_device line).
 # This is the fallback used when no `config-file` override is set.
-MANAGED_FILE="$SNAP_COMMON/config/usb_cam.yaml"
-PARAMS_FILE="$MANAGED_FILE"
-RUNTIME_ENV="$SNAP_DATA/runtime.env"
-# Separate location for URL-fetched overrides so we never clobber the
-# managed default file above.
+DEFAULT_CONFIG_FILE="$SNAP_COMMON/config/usb_cam.yaml"
+PARAMS_FILE="$DEFAULT_CONFIG_FILE"
+
+# Define a separate location for URL-fetched overrides so we don't override the default config file.
 CONFIG_FILE_DOWNLOAD="$SNAP_COMMON/config/usb_cam.remote.yaml"
 
-# NAMESPACE, CONFIG_FILE_URL, CONFIG_FILE_PATH (all optional)
-if [ -f "$RUNTIME_ENV" ]; then
-  # shellcheck disable=SC1090
-  . "$RUNTIME_ENV"
-fi
+NAMESPACE="$(snapctl get namespace)"
+CONFIG_FILE="$(snapctl get config-file)"
 
-if [ -n "${CONFIG_FILE_URL:-}" ]; then
+if [ -n "$CONFIG_FILE" ] && printf '%s' "$CONFIG_FILE" | grep -qE '^https?://'; then
   # Full-override config file served from a URL: re-download on every start
   # so an upstream update is picked up on the next launch/restart.
   mkdir -p "$(dirname "$CONFIG_FILE_DOWNLOAD")"
-  echo "usb-cam: downloading config-file override from $CONFIG_FILE_URL" >&2
+  echo "usb-cam: downloading config-file override from $CONFIG_FILE" >&2
   if ! curl --fail --silent --show-error --location \
-      --output "$CONFIG_FILE_DOWNLOAD" "$CONFIG_FILE_URL"; then
-    echo "usb-cam: failed to download config-file from $CONFIG_FILE_URL" >&2
+      --output "$CONFIG_FILE_DOWNLOAD" "$CONFIG_FILE"; then
+    echo "usb-cam: failed to download config-file from $CONFIG_FILE" >&2
     exit 1
   fi
   PARAMS_FILE="$CONFIG_FILE_DOWNLOAD"
-elif [ -n "${CONFIG_FILE_PATH:-}" ]; then
-  # Full-override config file at a local path (must live under $SNAP_COMMON).
-  PARAMS_FILE="$CONFIG_FILE_PATH"
+elif [ -n "$CONFIG_FILE" ]; then
+  PARAMS_FILE="$CONFIG_FILE"
 fi
 
 if [ ! -f "$PARAMS_FILE" ]; then
@@ -57,7 +52,7 @@ fi
 
 set -- ros2 run usb_cam usb_cam_node_exe --ros-args --params-file "$PARAMS_FILE"
 
-if [ -n "${NAMESPACE:-}" ]; then
+if [ -n "$NAMESPACE" ]; then
   set -- "$@" -r __ns:="$NAMESPACE"
 fi
 

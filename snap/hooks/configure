@@ -5,23 +5,14 @@
 # own --params-file interface); this hook only handles:
 #
 #   - video-device: a convenience shortcut that patches the video_device
-#     line of the managed default config at $SNAP_COMMON/config/usb_cam.yaml
-#     (seeded once by snap/hooks/install). Named after the ROS parameter it
-#     sets (video_device); snap config keys must be dash-separated rather
-#     than underscore-separated. Ignored if `config-file` is set.
-#   - config-file: a full override, either a local path under $SNAP_COMMON
-#     or a URL, taking precedence over the managed default entirely. See
-#     snap/local/usb-cam-launch for how it's consumed.
-#   - namespace: launcher invocation details that aren't ROS node
-#     parameters (remap args), rendered to $SNAP_DATA/runtime.env.
-#
-# For anything else (resolution, framerate, pixel format, brightness, ...),
-# edit $SNAP_COMMON/config/usb_cam.yaml directly (or point `config-file` at
-# your own file/URL), then `sudo snap restart usb-cam` to apply.
+#     line of the local default config at $SNAP_COMMON/config/usb_cam.yaml
+#     (seeded once by snap/hooks/install). Ignored if `config-file` is set.
+#   - config-file: a full URL override taking precedence over the local default config.
+#   - namespace: camera node namespace validated here and read from snap config at
+#     runtime by the launcher.
 set -e
 
 get() {
-  # $1 = key, $2 = default
   val="$(snapctl get "$1")"
   if [ -z "$val" ]; then
     val="$2"
@@ -30,10 +21,7 @@ get() {
 }
 
 # ROS 2 names (node names, namespace segments) may only contain letters,
-# digits and underscores, and must start with a letter or underscore --
-# dashes are NOT allowed. Validate here and fail with a clear message
-# instead of letting rcl abort the process at startup with a cryptic
-# "Couldn't parse remap rule" error.
+# digits and underscores, and must start with a letter or underscore.
 is_valid_ros_token() {
   case "$1" in
     '') return 1 ;;
@@ -55,20 +43,43 @@ validate_namespace() {
   done
 }
 
-MANAGED_FILE="$SNAP_COMMON/config/usb_cam.yaml"
+# A config-file override must be either an http(s) URL or a readable path
+# under $SNAP_COMMON (so the strictly-confined snap can read it). Blocks and
+# exits on anything else.
+validate_config_file() {
+  cf="$1"
+  case "$cf" in
+    http://*|https://*)
+      return 0 ;;
+    "$SNAP_COMMON"/*)
+      [ -r "$cf" ] && return 0
+      echo "usb-cam: config-file not found or not readable: $cf" >&2
+      snapctl set-health blocked "config-file not found or not readable: $cf"
+      exit 1 ;;
+    *)
+      echo "usb-cam: invalid config-file: '$cf' (must be a URL or a path under \$SNAP_COMMON, i.e. $SNAP_COMMON)" >&2
+      snapctl set-health blocked "invalid config-file: '$cf' (must be a URL or a path under \$SNAP_COMMON)"
+      exit 1 ;;
+  esac
+}
 
-# `install` doesn't re-run on refresh, so make sure the managed
-# file exists even when upgrading from a version that predates this hook.
-mkdir -p "$SNAP_COMMON/config"
-if [ ! -f "$MANAGED_FILE" ]; then
-  cp "$SNAP/usr/share/usb-cam/default-params.yaml" "$MANAGED_FILE"
-fi
+# Patch the video_device line of the managed default config in place.
+patch_video_device() {
+  dev="$1"
+  if grep -q 'video_device: "' "$DEFAULT_CONFIG_FILE"; then
+    sed -i "s|video_device: \"[^\"]*\"|video_device: \"$dev\"|" "$DEFAULT_CONFIG_FILE"
+  else
+    echo "usb-cam: could not find a 'video_device: \"...\"' line in $DEFAULT_CONFIG_FILE to patch -- edit it directly instead" >&2
+    snapctl set-health blocked "could not patch video_device in $DEFAULT_CONFIG_FILE -- edit it directly"
+    exit 1
+  fi
+}
+
+DEFAULT_CONFIG_FILE="$SNAP_COMMON/config/usb_cam.yaml"
 
 VIDEO_DEVICE="$(get video-device "")"
 NAMESPACE="$(get namespace "")"
 CONFIG_FILE="$(get config-file "")"
-CONFIG_FILE_URL=""
-CONFIG_FILE_PATH=""
 
 if [ -n "$NAMESPACE" ] && ! validate_namespace "$NAMESPACE"; then
   suggestion="$(printf '%s' "$NAMESPACE" | tr '-' '_')"
@@ -78,45 +89,13 @@ if [ -n "$NAMESPACE" ] && ! validate_namespace "$NAMESPACE"; then
 fi
 
 if [ -n "$CONFIG_FILE" ]; then
-  case "$CONFIG_FILE" in
-    http://*|https://*)
-      CONFIG_FILE_URL="$CONFIG_FILE"
-      ;;
-    "$SNAP_COMMON"/*)
-      if [ ! -r "$CONFIG_FILE" ]; then
-        echo "usb-cam: config-file not found or not readable: $CONFIG_FILE" >&2
-        snapctl set-health blocked "config-file not found or not readable: $CONFIG_FILE"
-        exit 1
-      fi
-      CONFIG_FILE_PATH="$CONFIG_FILE"
-      ;;
-    *)
-      echo "usb-cam: invalid config-file: '$CONFIG_FILE' (must be a URL or a path under \$SNAP_COMMON, i.e. $SNAP_COMMON)" >&2
-      snapctl set-health blocked "invalid config-file: '$CONFIG_FILE' (must be a URL or a path under \$SNAP_COMMON)"
-      exit 1
-      ;;
-  esac
+  validate_config_file "$CONFIG_FILE"
   if [ -n "$VIDEO_DEVICE" ]; then
     echo "usb-cam: config-file override active ($CONFIG_FILE) -- 'video-device' is ignored" >&2
   fi
 elif [ -n "$VIDEO_DEVICE" ]; then
-  if grep -q 'video_device: "' "$MANAGED_FILE"; then
-    sed -i "s|video_device: \"[^\"]*\"|video_device: \"$VIDEO_DEVICE\"|" "$MANAGED_FILE"
-  else
-    echo "usb-cam: could not find a 'video_device: \"...\"' line in $MANAGED_FILE to patch -- edit it directly instead" >&2
-    snapctl set-health blocked "could not patch video_device in $MANAGED_FILE -- edit it directly"
-    exit 1
-  fi
+  patch_video_device "$VIDEO_DEVICE"
 fi
-
-mkdir -p "$SNAP_DATA"
-
-{
-  [ -n "$NAMESPACE" ] && echo "NAMESPACE=\"$NAMESPACE\""
-  [ -n "$CONFIG_FILE_URL" ] && echo "CONFIG_FILE_URL=\"$CONFIG_FILE_URL\""
-  [ -n "$CONFIG_FILE_PATH" ] && echo "CONFIG_FILE_PATH=\"$CONFIG_FILE_PATH\""
-  true
-} > "$SNAP_DATA/runtime.env"
 
 snapctl set-health okay
 snapctl start --enable "$SNAP_NAME.usb-cam" || true

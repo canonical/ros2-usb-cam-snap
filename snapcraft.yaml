@@ -9,14 +9,15 @@ source-code: https://github.com/ros-drivers/usb_cam
 website: https://github.com/ros-drivers/usb_cam
 summary: ROS 2 driver for V4L2 USB cameras (Logitech C920 and others)
 description: |
-  Snap of the ros-drivers/usb_cam ROS 2 (Jazzy) node.
-  The snap runs `usb_cam_node_exe` as a systemd
-  daemon, sharing the ROS 2 Jazzy runtime from the `ros-jazzy-ros-base`.
+  Snap of the ros-drivers/usb_cam ROS 2 node.
+  The snap runs usb-cam node as a daemon,
+  sharing the ROS 2 Jazzy runtime from the `ros-jazzy-ros-base`.
 
   Camera configuration always goes through a ROS params YAML file, matching
   upstream usb_cam's own `--params-file` interface. A managed default is
   seeded at $SNAP_COMMON/config/usb_cam.yaml on install, including
-  `video_device: "/dev/video0"` by default -- edit it directly for full
+  `video_device: "/dev/video0"` by default.
+  This can be edited directly for full
   control, or use the `video-device` key as a shortcut for the common case
   of just pointing at a camera:
 
@@ -27,10 +28,15 @@ description: |
   For anything beyond the video-device path (resolution, framerate, pixel
   format, brightness, camera_info_url, ...), edit
   $SNAP_COMMON/config/usb_cam.yaml directly, or hand the snap a completely
-  separate file/URL, which takes precedence over the managed default:
+  separate file/URL, which takes precedence over the default file:
 
-      snap set ros2-usb-cam config-file=/var/snap/ros2-usb-cam/common/config/usb_cam.yaml
       snap set ros2-usb-cam config-file=https://example.com/usb_cam.yaml
+
+  To discard local edits and restore the packaged default config, run the
+  reset-config app, then restart:
+
+      ros2-usb-cam.reset-config
+      snap restart ros2-usb-cam
 
   Run a second camera on the same host with snapd parallel installs:
 
@@ -64,6 +70,9 @@ apps:
       - network
       - network-bind
 
+  reset-config:
+    command: usr/bin/reset-config
+
 hooks:
   configure:
     plugs:
@@ -90,5 +99,6 @@ parts:
     override-build: |
       mkdir -p "${CRAFT_PART_INSTALL}/usr/bin"
       install -m 755 "${CRAFT_PART_SRC}/usb-cam-launch" "${CRAFT_PART_INSTALL}/usr/bin/usb-cam-launch"
+      install -m 755 "${CRAFT_PART_SRC}/reset-config" "${CRAFT_PART_INSTALL}/usr/bin/reset-config"
       mkdir -p "${CRAFT_PART_INSTALL}/usr/share/usb-cam"
       install -m 644 "${CRAFT_PART_SRC}/default-params.yaml" "${CRAFT_PART_INSTALL}/usr/share/usb-cam/default-params.yaml"

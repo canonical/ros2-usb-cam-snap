@@ -28,7 +28,7 @@ jobs:
         #!/bin/bash
         set -euxo pipefail
 
-        SNAP_NAME=usb-cam
+        SNAP_NAME=ros2-usb-cam
 
         echo "=== Checking snap is installed ==="
         snap list "$SNAP_NAME"
@@ -42,12 +42,19 @@ jobs:
         echo "=== Checking the managed default config was seeded by the install hook ==="
         sudo test -f /var/snap/"$SNAP_NAME"/common/config/usb_cam.yaml
 
+        echo "=== Checking the install hook set the default namespace ==="
+        test "$(sudo snap get "$SNAP_NAME" namespace)" = "/static_camera"
+
         echo "=== Configuring via the 'video-device' shortcut with a non-existent path (safe, no hardware) ==="
         sudo snap set "$SNAP_NAME" video-device=/dev/video99
         sleep 5
         snap services "$SNAP_NAME"
         grep -q 'video_device: "/dev/video99"' <(sudo cat /var/snap/"$SNAP_NAME"/common/config/usb_cam.yaml)
         sudo snap logs "$SNAP_NAME" -n 30 || true
+
+        echo "=== Restoring packaged defaults via the reset-config app ==="
+        sudo snap run "$SNAP_NAME".reset-config
+        grep -q 'video_device: "/dev/video0"' <(sudo cat /var/snap/"$SNAP_NAME"/common/config/usb_cam.yaml)
 
         echo "=== Configuring via a separate config-file override (safe, no hardware) ==="
         sudo mkdir -p /var/snap/"$SNAP_NAME"/common/my-config
