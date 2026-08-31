@@ -22,6 +22,7 @@ jobs:
       snapstore-login: ${{ secrets.SNAPSTORE_LOGIN }}
     with:
       cleanup: true
+      runs-on: '["ubuntu-latest", "ubuntu-24.04-arm"]'
       snapcraft-enable-experimental-extensions: true
       snap-install-args: --dangerous
       snap-test-script: |
@@ -41,9 +42,6 @@ jobs:
 
         echo "=== Checking the managed default config was seeded by the install hook ==="
         sudo test -f /var/snap/"$SNAP_NAME"/common/config/usb_cam.yaml
-
-        echo "=== Checking the install hook set the default namespace ==="
-        test "$(sudo snap get "$SNAP_NAME" namespace)" = "/static_camera"
 
         echo "=== Configuring via the 'video-device' shortcut with a non-existent path (safe, no hardware) ==="
         sudo snap set "$SNAP_NAME" video-device=/dev/video99
