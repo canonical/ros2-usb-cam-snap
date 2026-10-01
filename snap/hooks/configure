@@ -9,6 +9,8 @@
 #   - config-file: a full URL override taking precedence over the local default config.
 #   - namespace: camera node namespace validated here and read from snap config at
 #     runtime by the launcher.
+#   - domain-id: ROS_DOMAIN_ID validated here and read from snap config at
+#     runtime by the launcher.
 set -e
 
 get() {
@@ -26,6 +28,16 @@ is_valid_ros_token() {
     '') return 1 ;;
   esac
   printf '%s' "$1" | grep -qE '^[a-zA-Z_][a-zA-Z0-9_]*$'
+}
+
+# ROS_DOMAIN_ID must be a non-negative integer. Values above 232 are
+# discouraged (reserved/unsafe on some platforms per the ROS 2 docs), so
+# we cap the accepted range at 0-232.
+is_valid_domain_id() {
+  case "$1" in
+    ''|*[!0-9]*) return 1 ;;
+  esac
+  [ "$1" -ge 0 ] && [ "$1" -le 232 ]
 }
 
 validate_namespace() {
@@ -79,11 +91,18 @@ DEFAULT_CONFIG_FILE="$SNAP_COMMON/config/usb_cam.yaml"
 VIDEO_DEVICE="$(get video-device "")"
 NAMESPACE="$(get namespace "")"
 CONFIG_FILE="$(get config-file "")"
+DOMAIN_ID="$(get domain-id "")"
 
 if [ -n "$NAMESPACE" ] && ! validate_namespace "$NAMESPACE"; then
   suggestion="$(printf '%s' "$NAMESPACE" | tr '-' '_')"
   echo "usb-cam: invalid namespace '$NAMESPACE' -- ROS namespaces must start with '/' and each segment may only contain letters, digits and underscores (no dashes). Try: namespace=$suggestion" >&2
   snapctl set-health blocked "invalid namespace '$NAMESPACE': use '/' + letters/digits/underscores only, e.g. $suggestion"
+  exit 1
+fi
+
+if [ -n "$DOMAIN_ID" ] && ! is_valid_domain_id "$DOMAIN_ID"; then
+  echo "usb-cam: invalid domain-id '$DOMAIN_ID' -- ROS_DOMAIN_ID must be an integer between 0 and 232" >&2
+  snapctl set-health blocked "invalid domain-id '$DOMAIN_ID': must be an integer between 0 and 232"
   exit 1
 fi
 

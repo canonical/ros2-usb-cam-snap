@@ -89,9 +89,11 @@ snap unset ros2-usb-cam config-file
 | Key | Purpose |
 |---|---|
 | `namespace` | ROS namespace remap (`-r __ns:=...`) |
+| `domain-id` | Sets `ROS_DOMAIN_ID` for the node, e.g. `snap set ros2-usb-cam domain-id=5` |
 
-`namespace` must follow ROS 2 naming rules. The configure hook validates this
-and rejects invalid values with a clear error.
+`namespace` must follow ROS 2 naming rules, and `domain-id` must be an
+integer between 0 and 232. The configure hook validates both and rejects
+invalid values with a clear error.
 
 ## Multiple cameras on one host
 

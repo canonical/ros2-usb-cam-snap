@@ -27,6 +27,7 @@ CONFIG_FILE_DOWNLOAD="$SNAP_COMMON/config/usb_cam.remote.yaml"
 
 NAMESPACE="$(snapctl get namespace)"
 CONFIG_FILE="$(snapctl get config-file)"
+DOMAIN_ID="$(snapctl get domain-id)"
 
 if [ -n "$CONFIG_FILE" ] && printf '%s' "$CONFIG_FILE" | grep -qE '^https?://'; then
   # Full-override config file served from a URL: re-download on every start
@@ -53,6 +54,10 @@ set -- ros2 run usb_cam usb_cam_node_exe --ros-args --params-file "$PARAMS_FILE"
 
 if [ -n "$NAMESPACE" ]; then
   set -- "$@" -r __ns:="$NAMESPACE"
+fi
+
+if [ -n "$DOMAIN_ID" ]; then
+  export ROS_DOMAIN_ID="$DOMAIN_ID"
 fi
 
 echo "usb-cam: exec: $*" >&2
