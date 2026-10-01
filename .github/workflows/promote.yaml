@@ -1,0 +1,21 @@
+name: promote
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'usb-cam track to promote from candidate to stable'
+        required: true
+        default: latest
+        type: choice
+        options:
+          - latest
+
+jobs:
+  snaps:
+    uses: canonical/robotics-actions-workflows/.github/workflows/promote.yaml@main
+    secrets:
+      snapstore-login: ${{ secrets.STORE_LOGIN }}
+    with:
+      snap: usb-cam
+      from-channel: '${{ inputs.version }}/candidate'
+      to-channel: '${{ inputs.version }}/stable'
