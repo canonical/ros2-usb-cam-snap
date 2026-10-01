@@ -2,8 +2,7 @@
 # snap/local/usb-cam-launch.sh
 #
 # Entry point for the `usb-cam` daemon app. Reads snap configuration at
-# startup and launches the upstream usb_cam node via `ros2 run` with a
-# matching ROS params YAML file.
+# startup and launches the upstream usb_cam node.
 set -eu
 
 if [ ! -d "$SNAP/opt/ros/underlay_ws/opt/ros/$ROS_DISTRO" ]; then

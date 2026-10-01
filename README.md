@@ -15,12 +15,10 @@ snap connect ros2-usb-cam:camera
 
 **If installed from the Snap Store**, the `ros-jazzy-ros-base` content
 interface (see [Foundational snap](#foundational-snap)) auto-connects on its
-own -- no extra step needed.
+own.
 
-**If sideloaded with `--install --dangerous`** (local builds, CI), snapd
-does **not** auto-connect it, and the daemon will fail to start with an
-error like `libclass_loader.so: cannot open shared object file` (the
-launcher now detects this case and fails with a clearer message instead).
+**If sideloaded with `--install --dangerous`**, snapd
+does **not** auto-connect it, and the daemon will fail to start.
 Connect it manually:
 
 ```
@@ -29,8 +27,7 @@ sudo snap restart ros2-usb-cam
 ```
 
 On install, a managed default ROS params file is seeded at
-`$SNAP_COMMON/config/usb_cam.yaml` (i.e.
-`/var/snap/ros2-usb-cam/common/config/usb_cam.yaml`), matching upstream's own
+`$SNAP_COMMON/config/usb_cam.yaml`, matching upstream's own
 [`params_1.yaml`](https://github.com/ros-drivers/usb_cam/blob/ros2/config/params_1.yaml)
 defaults, including `video_device: "/dev/video0"`. If that matches your
 setup, the managed file can be used as-is; otherwise override it below.
@@ -93,12 +90,8 @@ snap unset ros2-usb-cam config-file
 |---|---|
 | `namespace` | ROS namespace remap (`-r __ns:=...`) |
 
-`namespace` must follow ROS 2 naming rules: it must start with `/`, and
-each segment may only contain letters, digits and underscores (**no
-dashes**), with each segment starting with a letter or underscore, e.g.
-`/static_camera` (not `/static-camera`). The configure hook validates this
-and rejects invalid values with a clear error instead of letting the node
-crash-loop at startup with a cryptic `rcl` parse error.
+`namespace` must follow ROS 2 naming rules. The configure hook validates this
+and rejects invalid values with a clear error.
 
 ## Multiple cameras on one host
 
@@ -121,29 +114,6 @@ The daemon (`snap/local/usb-cam-launch.sh`) launches the node via
 built executable directly. This requires the content interface to be
 connected (see [Install](#install)); the launcher checks for this and fails
 with a clear, actionable message if it isn't.
-
-## Foundational snap
-
-This snap uses the `ros2-jazzy-ros-base` snapcraft extension, which shares
-the ROS 2 Jazzy runtime via the
-[`ros-jazzy-ros-base`](https://snapcraft.io/ros-jazzy-ros-base) content
-snap (see
-[canonical/ros-content-sharing-snaps](https://github.com/canonical/ros-content-sharing-snaps))
-instead of bundling the full ROS 2 runtime inside this snap. This keeps
-`ros2-usb-cam` smaller and lets multiple ROS 2 Jazzy snaps on the same host/Ubuntu
-Core device share one copy of the runtime (and its security updates), at the
-cost of a runtime dependency on that content snap being installed and kept
-compatible.
-
-For internet-connected hosts, snapd auto-installs `ros-jazzy-ros-base` via
-its `default-provider` the first time `ros2-usb-cam` (or any other snap using the
-same content) is installed from the Snap Store -- no extra step needed. This
-auto-connect does **not** apply to sideloaded/`--dangerous` installs (local
-builds, CI) -- see [Install](#install) above for the manual `snap connect`
-required in that case. For network-isolated or factory-seeded Ubuntu Core
-images, `ros-jazzy-ros-base` must instead be included in the device's model
-assertion/seed at image-build time, since there's no store access at runtime
-to fetch it on demand.
 
 ## CI
 

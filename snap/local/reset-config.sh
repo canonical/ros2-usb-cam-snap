@@ -1,11 +1,9 @@
 #!/bin/bash
 # snap/local/reset-config.sh
 #
-# Manual "restore defaults" action: overwrites the managed config at
+# Manually overwrites the managed config at
 # $SNAP_COMMON/config/usb_cam.yaml with the packaged default, discarding
-# any local edits. Never called by a hook -- run explicitly:
-#
-#   ros2-usb-cam.reset-config
+# any local edits.
 set -eu
 
 DEFAULT_CONFIG_FILE="$SNAP_COMMON/config/usb_cam.yaml"

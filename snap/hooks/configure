@@ -3,7 +3,6 @@
 # Applies `snap set usb-cam <key>=<value>` configuration. Camera parameters
 # are always driven by a ROS params YAML file (matching upstream usb_cam's
 # own --params-file interface); this hook only handles:
-#
 #   - video-device: a convenience shortcut that patches the video_device
 #     line of the local default config at $SNAP_COMMON/config/usb_cam.yaml
 #     (seeded once by snap/hooks/install). Ignored if `config-file` is set.
