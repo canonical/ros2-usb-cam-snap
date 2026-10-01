@@ -115,7 +115,7 @@ Publishes the standard usb_cam topics (`image_raw`, `image_raw/compressed`,
 
 ## Launch mechanism
 
-The daemon (`snap/local/usb-cam-launch`) launches the node via
+The daemon (`snap/local/usb-cam-launch.sh`) launches the node via
 `ros2 run usb_cam usb_cam_node_exe`, using the `ros2` CLI provided by the
 `ros-jazzy-ros-base` content snap (see below) rather than exec'ing the
 built executable directly. This requires the content interface to be

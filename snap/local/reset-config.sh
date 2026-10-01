@@ -1,5 +1,5 @@
 #!/bin/bash
-# snap/local/reset-config
+# snap/local/reset-config.sh
 #
 # Manual "restore defaults" action: overwrites the managed config at
 # $SNAP_COMMON/config/usb_cam.yaml with the packaged default, discarding
@@ -11,7 +11,7 @@ set -eu
 DEFAULT_CONFIG_FILE="$SNAP_COMMON/config/usb_cam.yaml"
 
 mkdir -p "$SNAP_COMMON/config"
-cp "$SNAP/usr/share/usb-cam/default-params.yaml" "$DEFAULT_CONFIG_FILE"
+cp "$SNAP/etc/configuration/default-params.yaml" "$DEFAULT_CONFIG_FILE"
 
 echo "usb-cam: reset $DEFAULT_CONFIG_FILE to packaged defaults" >&2
 echo "usb-cam: run 'sudo snap restart $SNAP_NAME' to apply" >&2

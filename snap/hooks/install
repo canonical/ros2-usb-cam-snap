@@ -17,5 +17,5 @@ done
 mkdir -p "$SNAP_COMMON/config"
 
 if [ ! -f "$SNAP_COMMON/config/usb_cam.yaml" ]; then
-  cp "$SNAP/usr/share/usb-cam/default-params.yaml" "$SNAP_COMMON/config/usb_cam.yaml"
+  cp "$SNAP/etc/configuration/default-params.yaml" "$SNAP_COMMON/config/usb_cam.yaml"
 fi

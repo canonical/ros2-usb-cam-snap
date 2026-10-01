@@ -1,11 +1,11 @@
 name: ros2-usb-cam
 title: ROS 2 usb-cam
 base: core24
-version: '0.8.1'
+adopt-info: usb-cam
 license: BSD-3-Clause
-contact: https://github.com/ros-drivers/usb_cam/issues
-issues: https://github.com/ros-drivers/usb_cam/issues
-source-code: https://github.com/ros-drivers/usb_cam
+contact: https://github.com/canonical/ros2-usb-cam-snap/issues
+issues: https://github.com/canonical/ros2-usb-cam-snap/issues
+source-code: https://github.com/canonical/ros2-usb-cam-snap
 website: https://github.com/ros-drivers/usb_cam
 summary: ROS 2 driver for V4L2 USB cameras (Logitech C920 and others)
 description: |
@@ -55,12 +55,9 @@ platforms:
 apps:
   usb-cam:
     extensions: [ros2-jazzy-ros-base]
-    command: usr/bin/usb-cam-launch
+    command: usr/bin/usb-cam-launch.sh
     environment:
-      LD_LIBRARY_PATH: >-
-        $SNAP/usr/lib/$SNAPCRAFT_ARCH_TRIPLET/lapack:
-        $SNAP/usr/lib/$SNAPCRAFT_ARCH_TRIPLET/blas:
-        $LD_LIBRARY_PATH
+      LD_LIBRARY_PATH: $SNAP/usr/lib/$SNAPCRAFT_ARCH_TRIPLET/lapack:$SNAP/usr/lib/$SNAPCRAFT_ARCH_TRIPLET/blas:$LD_LIBRARY_PATH
     daemon: simple
     install-mode: disable
     restart-condition: on-failure
@@ -71,7 +68,7 @@ apps:
       - network-bind
 
   reset-config:
-    command: usr/bin/reset-config
+    command: usr/bin/reset-config.sh
 
 hooks:
   configure:
@@ -83,22 +80,36 @@ parts:
     plugin: colcon
     source: https://github.com/ros-drivers/usb_cam.git
     source-tag: '0.8.1'
+    override-pull: |
+      craftctl default
+
+      # Checkout latest tagged version
+      git config --global --add safe.directory '*'
+      # set version and grade from code
+      version="$(git describe --always --tags| sed -e 's/^v//;y/-/./')"
+      craftctl set version="$version"
+      craftctl set grade="stable"
     colcon-packages: [usb_cam]
+    colcon-cmake-args:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DBUILD_TESTING=OFF
     stage-packages:
       - libgomp1
       - libdav1d7
       - libcurl3t64-gnutls
       - libslang2
 
-  launcher:
-    plugin: nil
-    source: snap/local
-    # Needed at runtime by usb-cam-launch to
+  scripts:
+    plugin: dump
+    source: snap/local/
+    # Needed at runtime by usb-cam-launch.sh to
     # download the optional URL-based `config-file`.
     stage-packages: [curl, ca-certificates]
-    override-build: |
-      mkdir -p "${CRAFT_PART_INSTALL}/usr/bin"
-      install -m 755 "${CRAFT_PART_SRC}/usb-cam-launch" "${CRAFT_PART_INSTALL}/usr/bin/usb-cam-launch"
-      install -m 755 "${CRAFT_PART_SRC}/reset-config" "${CRAFT_PART_INSTALL}/usr/bin/reset-config"
-      mkdir -p "${CRAFT_PART_INSTALL}/usr/share/usb-cam"
-      install -m 644 "${CRAFT_PART_SRC}/default-params.yaml" "${CRAFT_PART_INSTALL}/usr/share/usb-cam/default-params.yaml"
+    organize:
+      '*.sh': usr/bin/
+
+  configuration:
+    plugin: dump
+    source: snap/local/configuration/
+    organize:
+      '*': etc/configuration/

@@ -1,5 +1,5 @@
 #!/bin/bash
-# snap/local/usb-cam-launch
+# snap/local/usb-cam-launch.sh
 #
 # Entry point for the `usb-cam` daemon app. Reads snap configuration at
 # startup and launches the upstream usb_cam node via `ros2 run` with a

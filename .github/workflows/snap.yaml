@@ -73,6 +73,4 @@ jobs:
         sleep 5
         snap services "$SNAP_NAME"
         sudo snap logs "$SNAP_NAME" -n 30 || true
-        # The launcher logs the exec line, which should reference our override
-        # file instead of the managed default config.
         sudo snap logs "$SNAP_NAME" -n 30 | grep -q "my-config/usb_cam.yaml"
