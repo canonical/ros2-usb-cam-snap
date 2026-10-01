@@ -3,10 +3,10 @@ name: usb-cam snap
 on:
   push:
     branches:
-      - main
+      - jazzy
   pull_request:
     branches:
-      - main
+      - jazzy
   workflow_dispatch:
 
 permissions:
