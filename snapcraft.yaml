@@ -25,6 +25,13 @@ description: |
       snap connect ros2-usb-cam:camera
       snap set ros2-usb-cam video-device=/dev/video4 namespace=/static_camera
 
+  General ROS environment (ROS_DOMAIN_ID, RMW_IMPLEMENTATION,
+  FASTDDS_DEFAULT_PROFILES_FILE, ...) is set via the env-injector
+  extension, e.g.:
+
+      snap set ros2-usb-cam env.ros-domain-id=42
+      snap set ros2-usb-cam env.rmw-implementation=rmw_fastrtps_cpp
+
   For anything beyond the video-device path (resolution, framerate, pixel
   format, brightness, camera_info_url, ...), edit
   $SNAP_COMMON/config/usb_cam.yaml directly, or hand the snap a completely
@@ -33,17 +40,23 @@ description: |
       snap set ros2-usb-cam config-file=https://example.com/usb_cam.yaml
 
   To discard local edits and restore the packaged default config, run the
-  reset-config app, then restart:
+  reset-config app (this also unsets the `video-device` shortcut so the
+  reset sticks), then restart:
 
       ros2-usb-cam.reset-config
       snap restart ros2-usb-cam
 
-  Run a second camera on the same host with snapd parallel installs:
+  Run a second camera on the same host with snapd parallel installs
+  (experimental snapd feature; each instance gets its own configuration):
 
-      snap install --name=ros2-usb-cam-wrist ros2-usb-cam
+      snap set system experimental.parallel-instances=true
+      snap install ros2-usb-cam_wrist
+      snap set ros2-usb-cam_wrist video-device=/dev/video2 namespace=/wrist
 
   The snap publishes the standard usb_cam topics (`image_raw`, `image_raw/compressed`,
-  `camera_info`) under `<namespace>/<camera-name>` (or just `<namespace>`).
+  `camera_info`), scoped by the ROS namespace. The `camera_name` parameter
+  is not part of the topic path -- upstream only uses it for camera
+  metadata (`CameraInfo`).
 
 grade: stable
 confinement: strict
@@ -54,7 +67,7 @@ platforms:
 
 apps:
   usb-cam:
-    extensions: [ros2-jazzy-ros-base]
+    extensions: [ros2-jazzy-ros-base, env-injector]
     command: usr/bin/usb-cam-launch.sh
     environment:
       LD_LIBRARY_PATH: $SNAP/usr/lib/$SNAPCRAFT_ARCH_TRIPLET/lapack:$SNAP/usr/lib/$SNAPCRAFT_ARCH_TRIPLET/blas:$LD_LIBRARY_PATH

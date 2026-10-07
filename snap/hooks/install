@@ -2,17 +2,8 @@
 
 # Seeds a managed default ROS params YAML file under $SNAP_COMMON so the
 # camera has sane defaults to edit/patch.
+
 set -e
-
-if ! snapctl is-connected ros-jazzy-ros-base; then
-  logger -t "${SNAP_NAME}" "Plug 'ros-jazzy-ros-base' isn't connected, please run: snap connect $SNAP_NAME:ros-jazzy-ros-base <providing-snap>"
-fi
-
-for PLUG in camera; do
-  if ! snapctl is-connected "${PLUG}"; then
-    logger -t "${SNAP_NAME}" "Plug '${PLUG}' isn't connected, please run: snap connect $SNAP_NAME:${PLUG} before running the 'usb-cam' app."
-  fi
-done
 
 mkdir -p "$SNAP_COMMON/config"
 

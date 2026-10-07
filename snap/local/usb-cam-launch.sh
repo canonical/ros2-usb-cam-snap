@@ -11,11 +11,6 @@ if [ ! -d "$SNAP/opt/ros/underlay_ws/opt/ros/$ROS_DISTRO" ]; then
   exit 1
 fi
 
-if ! command -v ros2 >/dev/null 2>&1; then
-  echo "usb-cam: 'ros2' not found on PATH even though the content interface looks connected -- this is unexpected, please report a bug." >&2
-  exit 1
-fi
-
 # Default config file seeded once by snap/hooks/install and kept in sync
 # by snap/hooks/configure (video-device= patches its video_device line).
 # This is the fallback used when no `config-file` override is set.
@@ -27,7 +22,6 @@ CONFIG_FILE_DOWNLOAD="$SNAP_COMMON/config/usb_cam.remote.yaml"
 
 NAMESPACE="$(snapctl get namespace)"
 CONFIG_FILE="$(snapctl get config-file)"
-DOMAIN_ID="$(snapctl get domain-id)"
 
 if [ -n "$CONFIG_FILE" ] && printf '%s' "$CONFIG_FILE" | grep -qE '^https?://'; then
   # Full-override config file served from a URL: re-download on every start
@@ -54,10 +48,6 @@ set -- ros2 run usb_cam usb_cam_node_exe --ros-args --params-file "$PARAMS_FILE"
 
 if [ -n "$NAMESPACE" ]; then
   set -- "$@" -r __ns:="$NAMESPACE"
-fi
-
-if [ -n "$DOMAIN_ID" ]; then
-  export ROS_DOMAIN_ID="$DOMAIN_ID"
 fi
 
 echo "usb-cam: exec: $*" >&2

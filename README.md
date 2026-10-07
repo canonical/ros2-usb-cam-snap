@@ -89,24 +89,50 @@ snap unset ros2-usb-cam config-file
 | Key | Purpose |
 |---|---|
 | `namespace` | ROS namespace remap (`-r __ns:=...`) |
-| `domain-id` | Sets `ROS_DOMAIN_ID` for the node, e.g. `snap set ros2-usb-cam domain-id=5` |
 
-`namespace` must follow ROS 2 naming rules, and `domain-id` must be an
-integer between 0 and 232. The configure hook validates both and rejects
-invalid values with a clear error.
+`namespace` must follow ROS 2 naming rules (start with `/`, segments of
+letters/digits/underscores, no trailing `/` unless it is exactly `/`).
+The configure hook validates it and rejects invalid values with a clear
+error.
+
+### ROS environment (`ROS_DOMAIN_ID`, `RMW_IMPLEMENTATION`, ...)
+
+ROS environment variables are set through the
+[env-injector extension](https://ubuntu.com/docs/snapcraft/8/how-to/extensions/use-the-env-injector-extension/)
+rather than snap-specific keys. This covers `ROS_DOMAIN_ID`, explicitly
+selecting the RMW (the default `rmw_fastrtps_cpp` is bundled; alternatives
+like Zenoh must be staged into the snap first), or pointing Fast DDS at a
+custom XML profile:
+
+```
+snap set ros2-usb-cam env.ros-domain-id=5
+snap set ros2-usb-cam env.rmw-implementation=rmw_fastrtps_cpp
+snap set ros2-usb-cam env.fastdds-default-profiles-file=/var/snap/ros2-usb-cam/common/fastdds.xml
+```
 
 ## Multiple cameras on one host
 
-Use snapd parallel installs:
+Use snapd parallel installs (experimental snapd feature — enable it first):
 
 ```
-snap install --name=ros2-usb-cam-wrist ros2-usb-cam
+sudo snap set system experimental.parallel-instances=true
+snap install ros2-usb-cam_wrist
+```
+
+The instance gets its own configuration, so point each camera at its own
+device and namespace, e.g.:
+
+```
+snap set ros2-usb-cam_wrist video-device=/dev/video2 namespace=/wrist
 ```
 
 ## Topics
 
 Publishes the standard usb_cam topics (`image_raw`, `image_raw/compressed`,
-`camera_info`) under `<namespace>/<camera-name>` (or just `<namespace>`).
+`camera_info`), scoped by the ROS namespace (`<namespace>/image_raw`, or
+just `image_raw` in the global namespace). The `camera_name` parameter is
+not part of the topic path -- upstream only uses it for camera metadata
+(`CameraInfo`).
 
 ## Launch mechanism
 
