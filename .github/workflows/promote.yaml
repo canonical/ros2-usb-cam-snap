@@ -16,6 +16,6 @@ jobs:
     secrets:
       snapstore-login: ${{ secrets.STORE_LOGIN }}
     with:
-      snap: usb-cam
+      snap: ros2-usb-cam
       from-channel: '${{ inputs.version }}/candidate'
       to-channel: '${{ inputs.version }}/stable'
