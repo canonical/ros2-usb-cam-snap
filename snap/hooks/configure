@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 # Applies `snap set usb-cam <key>=<value>` configuration. Camera parameters
 # are always driven by a ROS params YAML file (matching upstream usb_cam's
@@ -41,8 +41,11 @@ validate_namespace() {
     *) return 1 ;;
   esac
   rest="${ns#/}"
-  IFS='/' read -ra segments <<< "$rest"
-  for seg in "${segments[@]}"; do
+  old_ifs="$IFS"
+  IFS='/'
+  set -- $rest
+  IFS="$old_ifs"
+  for seg in "$@"; do
     is_valid_ros_token "$seg" || return 1
   done
 }
@@ -62,7 +65,7 @@ validate_config_file() {
       exit 1 ;;
     *)
       echo "usb-cam: invalid config-file: '$cf' (must be a URL or a path under \$SNAP_COMMON, i.e. $SNAP_COMMON)" >&2
-      snapctl set-health blocked "invalid config-file: '$cf' (must be a URL or a path under \$SNAP_COMMON)"
+      snapctl set-health blocked "invalid config-file: '$cf' (must be a URL or a path under \$SNAP_COMMON/config/usb_cam.yaml)"
       exit 1 ;;
   esac
 }

@@ -1,13 +1,13 @@
-#!/bin/bash
+#!/bin/sh
 # snap/local/usb-cam-launch.sh
 #
 # Entry point for the `usb-cam` daemon app. Reads snap configuration at
 # startup and launches the upstream usb_cam node.
 set -eu
 
-if [ ! -d "$SNAP/opt/ros/underlay_ws/opt/ros/$ROS_DISTRO" ]; then
-  echo "usb-cam: the 'ros-jazzy-ros-base' content interface is not connected (\$SNAP/opt/ros/underlay_ws is empty)." >&2
-  echo "usb-cam: run: sudo snap connect $SNAP_NAME:ros-jazzy-ros-base ros-jazzy-ros-base && sudo snap restart $SNAP_NAME" >&2
+if ! snapctl is-connected ros-jazzy-ros-base; then
+  echo "usb-cam: the 'ros-jazzy-ros-base' content interface is not connected." >&2
+  echo "usb-cam: run: sudo snap connect $SNAP_NAME:ros-jazzy-ros-base ros-jazzy-ros-base:ros-jazzy-ros-base && sudo snap restart $SNAP_NAME" >&2
   exit 1
 fi
 

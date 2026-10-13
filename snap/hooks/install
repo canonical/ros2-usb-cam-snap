@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 # Seeds a managed default ROS params YAML file under $SNAP_COMMON so the
 # camera has sane defaults to edit/patch.

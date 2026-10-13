@@ -100,8 +100,7 @@ error.
 ROS environment variables are set through the
 [env-injector extension](https://ubuntu.com/docs/snapcraft/8/how-to/extensions/use-the-env-injector-extension/)
 rather than snap-specific keys. This covers `ROS_DOMAIN_ID`, explicitly
-selecting the RMW (the default `rmw_fastrtps_cpp` is bundled; alternatives
-like Zenoh must be staged into the snap first), or pointing Fast DDS at a
+selecting the RMW, or pointing Fast DDS at a
 custom XML profile:
 
 ```

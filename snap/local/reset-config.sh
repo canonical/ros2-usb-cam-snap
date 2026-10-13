@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 # snap/local/reset-config.sh
 #
 # Manually overwrites the managed config at

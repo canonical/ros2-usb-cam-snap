@@ -3,12 +3,13 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'usb-cam track to promote from candidate to stable'
+        description: 'ros2-usb-cam track to promote from candidate to stable'
         required: true
         default: latest
         type: choice
         options:
           - latest
+          - jazzy
 
 jobs:
   snaps:

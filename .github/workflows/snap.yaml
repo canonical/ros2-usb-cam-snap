@@ -24,7 +24,6 @@ jobs:
       cleanup: true
       runs-on: '["ubuntu-latest", "ubuntu-24.04-arm"]'
       snapcraft-enable-experimental-extensions: true
-      snap-install-args: --dangerous
       snap-test-script: |
         #!/bin/bash
         set -euxo pipefail
