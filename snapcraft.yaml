@@ -69,8 +69,6 @@ apps:
   usb-cam:
     extensions: [ros2-jazzy-ros-base, env-injector]
     command: usr/bin/usb-cam-launch.sh
-    environment:
-      LD_LIBRARY_PATH: $SNAP/usr/lib/$SNAPCRAFT_ARCH_TRIPLET/lapack:$SNAP/usr/lib/$SNAPCRAFT_ARCH_TRIPLET/blas:$LD_LIBRARY_PATH
     daemon: simple
     install-mode: disable
     restart-condition: on-failure
@@ -104,7 +102,6 @@ parts:
       craftctl set grade="stable"
     colcon-packages: [usb_cam]
     colcon-cmake-args:
-      - -DCMAKE_BUILD_TYPE=Release
       - -DBUILD_TESTING=OFF
     stage-packages:
       - libgomp1
