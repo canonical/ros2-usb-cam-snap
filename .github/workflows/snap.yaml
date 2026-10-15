@@ -1,0 +1,69 @@
+name: usb-cam snap
+
+on:
+  push:
+    branches:
+      - jazzy
+  pull_request:
+    branches:
+      - jazzy
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  snap:
+    permissions:
+      contents: read
+      actions: write
+    uses: canonical/robotics-actions-workflows/.github/workflows/snap.yaml@main
+    secrets:
+      snapstore-login: ${{ secrets.SNAPSTORE_LOGIN }}
+    with:
+      cleanup: true
+      runs-on: '["ubuntu-latest", "ubuntu-24.04-arm"]'
+      snapcraft-enable-experimental-extensions: true
+      snap-test-script: |
+        #!/bin/bash
+        set -euxo pipefail
+
+        SNAP_NAME=ros2-usb-cam
+
+        echo "Connecting the ros-jazzy-ros-base content interface"
+        sudo snap connect "$SNAP_NAME":ros-jazzy-ros-base ros-jazzy-ros-base:ros-jazzy-ros-base
+        snap connections "$SNAP_NAME"
+
+        echo "Checking the managed default config was seeded by the install hook"
+        sudo test -f /var/snap/"$SNAP_NAME"/common/config/usb_cam.yaml
+
+        echo "Configuring via the 'video-device' shortcut with a non-existent path (safe, no hardware)"
+        sudo snap set "$SNAP_NAME" video-device=/dev/video99
+        sleep 5
+        snap services "$SNAP_NAME"
+        grep -q 'video_device: "/dev/video99"' <(sudo cat /var/snap/"$SNAP_NAME"/common/config/usb_cam.yaml)
+        sudo snap logs "$SNAP_NAME" -n 30 || true
+
+        echo "Restoring packaged defaults via the reset-config app"
+        sudo snap run "$SNAP_NAME".reset-config
+        grep -q 'video_device: "/dev/video0"' <(sudo cat /var/snap/"$SNAP_NAME"/common/config/usb_cam.yaml)
+
+        echo "Configuring via a separate config-file override"
+        sudo mkdir -p /var/snap/"$SNAP_NAME"/common/my-config
+        cat <<'PARAMS_EOF' | sudo tee /var/snap/"$SNAP_NAME"/common/my-config/usb_cam.yaml >/dev/null
+        /**:
+          ros__parameters:
+            video_device: "/dev/video99"
+            framerate: 30.0
+            io_method: "mmap"
+            pixel_format: "mjpeg2rgb"
+            av_device_format: "YUV422P"
+            image_width: 640
+            image_height: 480
+            frame_id: "cam_test"
+            camera_name: "cam_test"
+        PARAMS_EOF
+        sudo snap set "$SNAP_NAME" config-file=/var/snap/"$SNAP_NAME"/common/my-config/usb_cam.yaml
+        sleep 5
+        snap services "$SNAP_NAME"
+        sudo snap logs "$SNAP_NAME" -n 30 | grep -q "my-config/usb_cam.yaml"

@@ -1,0 +1,109 @@
+#!/bin/sh
+
+# Applies `snap set usb-cam <key>=<value>` configuration. Camera parameters
+# are always driven by a ROS params YAML file (matching upstream usb_cam's
+# own --params-file interface); this hook only handles:
+#   - video-device: a convenience shortcut that patches the video_device
+#     line of the local default config at $SNAP_COMMON/config/usb_cam.yaml
+#     (seeded once by snap/hooks/install). Ignored if `config-file` is set.
+#   - config-file: a full URL override taking precedence over the local default config.
+#   - namespace: camera node namespace validated here and read from snap config at
+#     runtime by the launcher.
+# ROS environment (ROS_DOMAIN_ID, FASTDDS_DEFAULT_PROFILES_FILE, ...) is
+# handled by the env-injector extension via `snap set <snap> env.<key>=<value>`.
+set -e
+
+get() {
+  val="$(snapctl get "$1")"
+  if [ -z "$val" ]; then
+    val="$2"
+  fi
+  printf '%s' "$val"
+}
+
+# ROS 2 names (node names, namespace segments) may only contain letters,
+# digits and underscores, and must start with a letter or underscore.
+is_valid_ros_token() {
+  case "$1" in
+    '') return 1 ;;
+  esac
+  printf '%s' "$1" | grep -qE '^[a-zA-Z_][a-zA-Z0-9_]*$'
+}
+
+validate_namespace() {
+  ns="$1"
+  # "/" is the (valid) global namespace; any other trailing slash is
+  # rejected by ROS 2, so reject it here too.
+  [ "$ns" = "/" ] && return 0
+  case "$ns" in
+    /*/) return 1 ;;
+    /*) : ;;
+    *) return 1 ;;
+  esac
+  rest="${ns#/}"
+  old_ifs="$IFS"
+  IFS='/'
+  set -- $rest
+  IFS="$old_ifs"
+  for seg in "$@"; do
+    is_valid_ros_token "$seg" || return 1
+  done
+}
+
+# A config-file override must be either an http(s) URL or a readable path
+# under $SNAP_COMMON (so the strictly-confined snap can read it). Blocks and
+# exits on anything else.
+validate_config_file() {
+  cf="$1"
+  case "$cf" in
+    http://*|https://*)
+      return 0 ;;
+    "$SNAP_COMMON"/*)
+      [ -r "$cf" ] && return 0
+      echo "usb-cam: config-file not found or not readable: $cf" >&2
+      snapctl set-health blocked "config-file not found or not readable: $cf"
+      exit 1 ;;
+    *)
+      echo "usb-cam: invalid config-file: '$cf' (must be a URL or a path under \$SNAP_COMMON, i.e. $SNAP_COMMON/config/usb_cam.yaml)" >&2
+      snapctl set-health blocked "invalid config-file: '$cf' (must be a URL or a path under \$SNAP_COMMON/config/usb_cam.yaml)"
+      exit 1 ;;
+  esac
+}
+
+# Patch the video_device line of the managed default config in place.
+patch_video_device() {
+  dev="$1"
+  if grep -q 'video_device: "' "$DEFAULT_CONFIG_FILE"; then
+    sed -i "s|video_device: \"[^\"]*\"|video_device: \"$dev\"|" "$DEFAULT_CONFIG_FILE"
+  else
+    echo "usb-cam: could not find a 'video_device: \"...\"' line in $DEFAULT_CONFIG_FILE to patch -- edit it directly instead" >&2
+    snapctl set-health blocked "could not patch video_device in $DEFAULT_CONFIG_FILE -- edit it directly"
+    exit 1
+  fi
+}
+
+DEFAULT_CONFIG_FILE="$SNAP_COMMON/config/usb_cam.yaml"
+
+VIDEO_DEVICE="$(get video-device "")"
+NAMESPACE="$(get namespace "")"
+CONFIG_FILE="$(get config-file "")"
+
+if [ -n "$NAMESPACE" ] && ! validate_namespace "$NAMESPACE"; then
+  suggestion="$(printf '%s' "$NAMESPACE" | tr '-' '_')"
+  echo "usb-cam: invalid namespace '$NAMESPACE' -- ROS namespaces must start with '/' and each segment may only contain letters, digits and underscores (no dashes, no trailing '/'). Try: namespace=$suggestion" >&2
+  snapctl set-health blocked "invalid namespace '$NAMESPACE': use '/' + letters/digits/underscores only, no trailing '/', e.g. $suggestion"
+  exit 1
+fi
+
+if [ -n "$CONFIG_FILE" ]; then
+  validate_config_file "$CONFIG_FILE"
+  if [ -n "$VIDEO_DEVICE" ]; then
+    echo "usb-cam: config-file override active ($CONFIG_FILE) -- 'video-device' is ignored" >&2
+  fi
+elif [ -n "$VIDEO_DEVICE" ]; then
+  patch_video_device "$VIDEO_DEVICE"
+fi
+
+snapctl set-health okay
+snapctl start --enable "$SNAP_NAME.usb-cam" || true
+snapctl restart "$SNAP_NAME.usb-cam" || true

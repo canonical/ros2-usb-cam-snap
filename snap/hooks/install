@@ -1,0 +1,12 @@
+#!/bin/sh
+
+# Seeds a managed default ROS params YAML file under $SNAP_COMMON so the
+# camera has sane defaults to edit/patch.
+
+set -e
+
+mkdir -p "$SNAP_COMMON/config"
+
+if [ ! -f "$SNAP_COMMON/config/usb_cam.yaml" ]; then
+  cp "$SNAP/etc/configuration/default-params.yaml" "$SNAP_COMMON/config/usb_cam.yaml"
+fi

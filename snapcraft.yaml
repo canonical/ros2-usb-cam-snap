@@ -1,0 +1,125 @@
+name: ros2-usb-cam
+title: ROS 2 usb-cam
+base: core24
+adopt-info: usb-cam
+license: BSD-3-Clause
+contact: https://github.com/canonical/ros2-usb-cam-snap/issues
+issues: https://github.com/canonical/ros2-usb-cam-snap/issues
+source-code: https://github.com/canonical/ros2-usb-cam-snap
+website: https://github.com/ros-drivers/usb_cam
+summary: ROS 2 driver for V4L2 USB cameras (Logitech C920 and others)
+description: |
+  Snap of the ros-drivers/usb_cam ROS 2 node.
+  The snap runs usb-cam node as a daemon,
+  sharing the ROS 2 Jazzy runtime from the `ros-jazzy-ros-base`.
+
+  Camera configuration always goes through a ROS params YAML file, matching
+  upstream usb_cam's own `--params-file` interface. A managed default is
+  seeded at $SNAP_COMMON/config/usb_cam.yaml on install, including
+  `video_device: "/dev/video0"` by default.
+  This can be edited directly for full
+  control, or use the `video-device` key as a shortcut for the common case
+  of just pointing at a camera:
+
+      snap install ros2-usb-cam
+      snap connect ros2-usb-cam:camera
+      snap set ros2-usb-cam video-device=/dev/video4 namespace=/static_camera
+
+  General ROS environment (ROS_DOMAIN_ID, RMW_IMPLEMENTATION,
+  FASTDDS_DEFAULT_PROFILES_FILE, ...) is set via the env-injector
+  extension, e.g.:
+
+      snap set ros2-usb-cam env.ros-domain-id=42
+      snap set ros2-usb-cam env.rmw-implementation=rmw_fastrtps_cpp
+
+  For anything beyond the video-device path (resolution, framerate, pixel
+  format, brightness, camera_info_url, ...), edit
+  $SNAP_COMMON/config/usb_cam.yaml directly, or hand the snap a completely
+  separate file/URL, which takes precedence over the default file:
+
+      snap set ros2-usb-cam config-file=https://example.com/usb_cam.yaml
+
+  To discard local edits and restore the packaged default config, run the
+  reset-config app (this also unsets the `video-device` shortcut so the
+  reset sticks), then restart:
+
+      ros2-usb-cam.reset-config
+      snap restart ros2-usb-cam
+
+  Run a second camera on the same host with snapd parallel installs
+  (experimental snapd feature; each instance gets its own configuration):
+
+      snap set system experimental.parallel-instances=true
+      snap install ros2-usb-cam_wrist
+      snap set ros2-usb-cam_wrist video-device=/dev/video2 namespace=/wrist
+
+  The snap publishes the standard usb_cam topics (`image_raw`, `image_raw/compressed`,
+  `camera_info`), scoped by the ROS namespace. The `camera_name` parameter
+  is not part of the topic path -- upstream only uses it for camera
+  metadata (`CameraInfo`).
+
+grade: stable
+confinement: strict
+
+platforms:
+  amd64:
+  arm64:
+
+apps:
+  usb-cam:
+    extensions: [ros2-jazzy-ros-base, env-injector]
+    command: usr/bin/usb-cam-launch.sh
+    daemon: simple
+    install-mode: disable
+    restart-condition: on-failure
+    restart-delay: 5s
+    plugs:
+      - camera
+      - network
+      - network-bind
+
+  reset-config:
+    command: usr/bin/reset-config.sh
+
+hooks:
+  configure:
+    plugs:
+      - camera
+
+parts:
+  usb-cam:
+    plugin: colcon
+    source: https://github.com/ros-drivers/usb_cam.git
+    source-tag: '0.8.1'
+    override-pull: |
+      craftctl default
+
+      # Checkout latest tagged version
+      git config --global --add safe.directory '*'
+      # set version and grade from code
+      version="$(git describe --always --tags| sed -e 's/^v//;y/-/./')"
+      craftctl set version="$version"
+      craftctl set grade="stable"
+    colcon-packages: [usb_cam]
+    colcon-cmake-args:
+      - -DBUILD_TESTING=OFF
+    stage-packages:
+      - libgomp1
+      - libdav1d7
+      - libcurl3t64-gnutls
+      - libslang2
+
+  scripts:
+    plugin: dump
+    source: snap/local/
+    # Needed at runtime by usb-cam-launch.sh to
+    # download the optional URL-based `config-file`.
+    stage-packages: [curl, ca-certificates]
+    organize:
+      '*.sh': usr/bin/
+
+  configuration:
+    plugin: dump
+    source: snap/local/configuration/
+    organize:
+      '*': etc/configuration/
