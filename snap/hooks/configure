@@ -64,7 +64,7 @@ validate_config_file() {
       snapctl set-health blocked "config-file not found or not readable: $cf"
       exit 1 ;;
     *)
-      echo "usb-cam: invalid config-file: '$cf' (must be a URL or a path under \$SNAP_COMMON, i.e. $SNAP_COMMON)" >&2
+      echo "usb-cam: invalid config-file: '$cf' (must be a URL or a path under \$SNAP_COMMON, i.e. $SNAP_COMMON/config/usb_cam.yaml)" >&2
       snapctl set-health blocked "invalid config-file: '$cf' (must be a URL or a path under \$SNAP_COMMON/config/usb_cam.yaml)"
       exit 1 ;;
   esac
